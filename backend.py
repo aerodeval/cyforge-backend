@@ -2,8 +2,11 @@
 import base64
 import cv2
 import json
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import numpy as np
+import speech_recognition as sr
+import random
+
 
 app = Flask(__name__)
 
@@ -17,8 +20,6 @@ def process_image():
     # define range of blue color in HSV
     lower_white = np.array([0, 0, 255])
     upper_white = np.array([140, 5, 255])
-
-
 
     lower_green = np.array([36, 50, 100])
     upper_green = np.array([140, 60, 255])
@@ -37,6 +38,28 @@ def process_image():
     processed_image_data_recv = base64.b64encode(img_encodedrecv.tobytes()).decode('utf-8')
 
     return json.dumps({ 'image': processed_image_data,'image_recv':processed_image_data_recv })
+
+
+@app.route('/convert',methods=['POST'])
+def convert():
+    file = request.files['file']
+    suffix = random.randint(100000,999999)
+    suffix = str(suffix)
+    filename = f'audio_{suffix}.wav'
+    file.save(filename)
+
+    try:
+        r = sr.Recognizer()
+        with sr.AudioFile(filename) as source:
+            data = r.record(source)
+            text = r.recognize_google(data)
+
+    except:
+        return  f"Some error occured"
+
+    res = jsonify(text=text)
+    return res
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
