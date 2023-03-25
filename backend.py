@@ -1,13 +1,14 @@
 
 import base64
+import re
 import cv2
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request,jsonify
+import numpy as np
+import csv
 import numpy as np
 import speech_recognition as sr
 import random
-
-
 app = Flask(__name__)
 
 @app.route('/process-image', methods=['POST'])
@@ -18,11 +19,11 @@ def process_image():
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     cv2.imshow("hsv",hsv)
     # define range of blue color in HSV
-    lower_white = np.array([0, 0, 255])
-    upper_white = np.array([140, 5, 255])
-
-    lower_green = np.array([36, 50, 100])
-    upper_green = np.array([140, 60, 255])
+    lower_white = np.array([0, 0, 231])
+    upper_white = np.array([180, 8, 255])
+    lower_green = np.array([36, 0, 200])
+    upper_green = np.array([89, 155, 255
+    ])
     # Create a mask. Threshold the HSV image to get only yellow colors
     mask1 = cv2.inRange(hsv, lower_white, upper_white)
     mask2 = cv2.inRange(hsv, lower_green, upper_green)
@@ -38,7 +39,6 @@ def process_image():
     processed_image_data_recv = base64.b64encode(img_encodedrecv.tobytes()).decode('utf-8')
 
     return json.dumps({ 'image': processed_image_data,'image_recv':processed_image_data_recv })
-
 
 @app.route('/convert',methods=['POST'])
 def convert():
@@ -59,6 +59,39 @@ def convert():
 
     res = jsonify(text=text)
     return res
+@app.route('/text',methods=['POST'])
+def process_txt_file():
+    # Get the uploaded file from the request
+    file = request.files['file']
+    
+    # Read the contents of the file
+    contents = file.read().decode('utf-8')
+    
+    # Split the contents into individual lines
+    lines = contents.split('\n')
+    
+    # Initialize a dictionary to store the data for each sender
+    senders = {}
+    
+    # Loop through each line and split it into the timestamp, sender name, and message text
+    for line in lines:
+        # Use a regular expression to match the timestamp and sender name
+        match = re.match(r'(\d{2}/\d{2}/\d{4}, \d{1,2}:\d{2}\s*[ap]m) - (.+?): (.+)', line)
+        if match:
+            timestamp = match.group(1)
+            sender_name = match.group(2)
+            message_text = match.group(3)
+            
+            # Check if the sender name already exists in the dictionary
+            if sender_name in senders:
+                # If it does, add the message to the sender's list of messages
+                senders[sender_name].append({'timestamp': timestamp, 'message_text': message_text})
+            else:
+                # If it doesn't, create a new list for the sender and add the message to it
+                senders[sender_name] = [{'timestamp': timestamp, 'message_text': message_text}]
+    
+    # Return the data for each sender as a JSON response
+    return jsonify(senders)
 
 
 if __name__ == '__main__':
